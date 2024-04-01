@@ -1,0 +1,20 @@
+[project]
+name = "decthings-model"
+version = "0.0.1"
+description = "Create a Decthings model using Python"
+readme = "README.md"
+requires-python = ">=3.6"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    'decthings-api >= 0.0.1',
+]
+
+[project.urls]
+"Homepage" = "https://github.com/decthings/model-py"
+
+[project.scripts]
+my-client = "decthings_model.run.run:main"
