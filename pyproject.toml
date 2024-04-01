@@ -15,6 +15,3 @@ dependencies = [
 
 [project.urls]
 "Homepage" = "https://github.com/decthings/model-py"
-
-[project.scripts]
-my-client = "decthings_model.run.run:main"
