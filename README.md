@@ -2,6 +2,8 @@
 
 ## Decthings model using Python
 
+[![PyPI version](https://badge.fury.io/py/decthings-model.svg)](https://pypi.org/project/decthings-model/)
+
 Use Python to create a Decthings model.
 
 ### Setup
