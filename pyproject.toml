@@ -1,6 +1,6 @@
 [project]
 name = "decthings-model"
-version = "0.0.3"
+version = "0.0.4"
 description = "Create a Decthings model using Python"
 readme = "README.md"
 requires-python = ">=3.6"
