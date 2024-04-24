@@ -10,7 +10,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    'decthings-api >= 0.0.1',
+    'decthings-api >= 0.0.2',
 ]
 
 [project.urls]

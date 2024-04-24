@@ -1,6 +1,6 @@
 import typing
 import inspect
-from decthings_api.tensor import DecthingsTensor
+from decthings_api import DecthingsTensor
 
 class DataLoaderBinary:
     def __init__(self, inner) -> None:
