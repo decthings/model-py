@@ -114,37 +114,42 @@ class _Model:
         return new_params
 
     @staticmethod
-    def createModelState(executor, params, provider):
-        dataloader = _Model._create_data_loader_map(params)
+    def createModelState(executor, options):
+        class CreateModelStateOptions:
+            def __init__(self):
+                self.params = _Model._create_data_loader_map(options.params)
+                self.state_provider = options.state_provider
+                self.other_models = options.other_models
+
         if isinstance(executor, dict):
             if "createModelState" not in executor:
                 raise ValueError('The function "createModelState" was missing from the executor.')
             if not callable(executor["createModelState"]):
                 raise ValueError(f'The property "createModelState" on the executor was not a function - got {str(type(executor["createModelState"]))}.')
-            return executor["createModelState"](dataloader, provider)
+            return executor["createModelState"](CreateModelStateOptions())
         else:
             fn = getattr(executor, "createModelState", None)
             if fn is None:
                 raise ValueError('The function "createModelState" was missing from the executor.')
             if not callable(fn):
                 raise ValueError(f'The property "createModelState" on the executor was not a function - got {str(type(fn))}.')
-            return executor.createModelState(dataloader, provider)
+            return executor.createModelState(CreateModelStateOptions())
 
     @staticmethod
-    async def instantiateModel(executor, model_state: bytes):
+    async def instantiateModel(executor, options):
         if isinstance(executor, dict):
             if "instantiateModel" not in executor:
                 raise ValueError('The function "instantiateModel" was missing from the executor.')
             if not callable(executor["instantiateModel"]):
                 raise ValueError(f'The property "instantiateModel" on the executor was not a function - got {str(type(executor["instantiateModel"]))}.')
-            instantiated = executor["instantiateModel"](model_state)
+            instantiated = executor["instantiateModel"](options)
         else:
             fn = getattr(executor, "instantiateModel", None)
             if fn is None:
                 raise ValueError('The function "instantiateModel" was missing from the executor.')
             if not callable(fn):
                 raise ValueError(f'The property "instantiateModel" on the executor was not a function - got {str(type(fn))}.')
-            instantiated = executor.instantiateModel(model_state)
+            instantiated = executor.instantiateModel(options)
 
         if inspect.isawaitable(instantiated):
             awaitedinstantiated = await instantiated
@@ -152,28 +157,31 @@ class _Model:
             awaitedinstantiated = instantiated
 
         return {
-            "evaluate": lambda params: _Model.evaluate(awaitedinstantiated, params),
+            "evaluate": lambda options: _Model.evaluate(awaitedinstantiated, options),
             "dispose": lambda: _Model.dispose(awaitedinstantiated),
-            "getModelState": lambda provider: _Model.getModelState(awaitedinstantiated, provider),
-            "train": lambda tracker, params: _Model.train(awaitedinstantiated, tracker, params)
+            "getModelState": lambda options: _Model.getModelState(awaitedinstantiated, options),
+            "train": lambda options: _Model.train(awaitedinstantiated, options)
         }
 
     @staticmethod
-    async def evaluate(awaitedinstantiated, params):
-        dataloader = _Model._create_data_loader_map(params)
+    async def evaluate(awaitedinstantiated, options):
+        class EvaluateOptions:
+            def __init__(self):
+                self.params = _Model._create_data_loader_map(options.params)
+
         if isinstance(awaitedinstantiated, dict):
             if "evaluate" not in awaitedinstantiated:
                 raise ValueError('The function "evaluate" was missing from the instantiated model.')
             if not callable(awaitedinstantiated["evaluate"]):
                 raise ValueError(f'The property "evaluate" on the instantiated model was not a function - got {str(type(awaitedinstantiated["evaluate"]))}.')
-            res = awaitedinstantiated['evaluate'](dataloader)
+            res = awaitedinstantiated['evaluate'](EvaluateOptions())
         else:
             fn = getattr(awaitedinstantiated, "evaluate", None)
             if fn is None:
                 raise ValueError('The function "evaluate" was missing from the model.')
             if not callable(fn):
                 raise ValueError(f'The property "evaluate" on the model was not a function - got {str(type(fn))}.')
-            res = awaitedinstantiated.evaluate(dataloader)
+            res = awaitedinstantiated.evaluate(EvaluateOptions())
 
         if inspect.isawaitable(res):
             awaitedres = await res
@@ -218,41 +226,45 @@ class _Model:
             return awaitedinstantiated.dispose()
 
     @staticmethod
-    def getModelState(awaitedinstantiated, provider):
+    def getModelState(awaitedinstantiated, options):
         if isinstance(awaitedinstantiated, dict):
             if "getModelState" not in awaitedinstantiated:
                 raise ValueError('The function "getModelState" was missing from the instantiated model.')
             if not callable(awaitedinstantiated["getModelState"]):
                 raise ValueError(f'The property "getModelState" on the instantiated model was not a function - got {str(type(awaitedinstantiated["getModelState"]))}.')
-            return awaitedinstantiated["getModelState"](provider)
+            return awaitedinstantiated["getModelState"](options)
         else:
             fn = getattr(awaitedinstantiated, "getModelState", None)
             if fn is None:
                 raise ValueError('The function "getModelState" was missing from the instantiated model.')
             if not callable(fn):
                 raise ValueError(f'The property "getModelState" on the model was not a function - got {str(type(fn))}.')
-            return awaitedinstantiated.getModelState(provider)
+            return awaitedinstantiated.getModelState(options)
 
     @staticmethod
-    def train(awaitedinstantiated, params, tracker):
-        dataloader = _Model._create_data_loader_map(params)
+    def train(awaitedinstantiated, options):
+        class TrainOptions:
+            def __init__(self):
+                self.params = _Model._create_data_loader_map(options.params)
+                self.tracker = TrainTracker(options.tracker)
+
         if isinstance(awaitedinstantiated, dict):
             if "train" not in awaitedinstantiated:
                 raise ValueError('The function "train" was missing from the instantiated model.')
             if not callable(awaitedinstantiated["train"]):
                 raise ValueError(f'The property "train" on the instantiated model was not a function - got {str(type(awaitedinstantiated["train"]))}.')
-            return awaitedinstantiated["train"](dataloader, TrainTracker(tracker))
+            return awaitedinstantiated["train"](TrainOptions())
         else:
             fn = getattr(awaitedinstantiated, "train", None)
             if fn is None:
                 raise ValueError('The function "train" was missing from the instantiated model.')
             if not callable(fn):
                 raise ValueError(f'The property "train" on the instantiated model was not a function - got {str(type(fn))}.')
-            return awaitedinstantiated.train(dataloader, TrainTracker(tracker))
+            return awaitedinstantiated.train(TrainOptions)
 
 
 def make_model(executor) -> dict:
     return {
-        "createModelState": lambda params, provider: _Model.createModelState(executor, params, provider),
-        "instantiateModel": lambda model_state: _Model.instantiateModel(executor, model_state)
+        "createModelState": lambda options: _Model.createModelState(executor, options),
+        "instantiateModel": lambda options: _Model.instantiateModel(executor, options)
     }

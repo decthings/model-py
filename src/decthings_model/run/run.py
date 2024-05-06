@@ -74,18 +74,26 @@ def initialize(args):
         return
     sendEventToParent("modelSessionInitialized", {}, [])
 
+class OtherModelWithState:
+    def __init__(self, mount_path, state):
+        self.mount_path = mount_path
+        self.state = state
+
 async def callCreateModelState(args):
     complete = { "complete": False }
-    map = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
-    provider = createStateProvider(complete, args["id"], sendEventToParent)
-    other_model_states = {}
-    for other_model_state in args["otherModelStates"]:
-        other_model_states[other_model_state["id"]] = createStateLoaderMap(complete, other_model_state["state"], sendDataEventToParent)
+    class CreateModelStateOptions:
+        def __init__(self):
+            self.params = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
+            self.state_provider = createStateProvider(complete, args["id"], sendEventToParent)
+            self.other_models = {}
+            for other_model in args["otherModels"]:
+                self.other_models[other_model["id"]] = OtherModelWithState(other_model["mountPath"], createStateLoaderMap(complete, other_model["state"], sendDataEventToParent))
+
     try:
         if isinstance(runningProgram, dict):
-            res = runningProgram["createModelState"](map, provider)
+            res = runningProgram["createModelState"](CreateModelStateOptions())
         else:
-            res = runningProgram.createModelState(map, provider)
+            res = runningProgram.createModelState(CreateModelStateOptions())
 
         if inspect.isawaitable(res):
             await res
@@ -95,6 +103,10 @@ async def callCreateModelState(args):
     except:
         complete["complete"] = True
         return { "result": { "error": getErrorFromException() } }
+
+class OtherModel:
+    def __init__(self, mount_path):
+        self.mount_path = mount_path
 
 async def callInstantiateModel(args):
     disposed = False
@@ -115,13 +127,18 @@ async def callInstantiateModel(args):
     instantiatedModels[args["instantiatedModelId"]] = stored
 
     complete = { "complete": False }
-    stateLoaders = createStateLoaderMap(complete, args["state"], sendDataEventToParent)
+    class InstantiateModelOptions:
+        def __init__(self):
+            self.state = createStateLoaderMap(complete, args["state"], sendDataEventToParent)
+            self.other_models = {}
+            for other_model in args["otherModels"]:
+                self.other_models[other_model["id"]] = OtherModel(other_model["mountPath"])
 
     try:
         if isinstance(runningProgram, dict):
-            res = runningProgram["instantiateModel"](stateLoaders)
+            res = runningProgram["instantiateModel"](InstantiateModelOptions())
         else:
-            res = runningProgram.instantiateModel(stateLoaders)
+            res = runningProgram.instantiateModel(InstantiateModelOptions())
 
         if inspect.isawaitable(res):
             awaitedres = await res
@@ -156,11 +173,11 @@ def callDisposeInstantiatedModel(args):
         instantiatedModel["dispose"]
 
 async def callTrain(args):
-    tracker = TrainTracker(args["trainingSessionId"])
-    trainingSessions[args["trainingSessionId"]] = tracker
-
     if not args["instantiatedModelId"] in instantiatedModels:
         return { "result": { "error": "instantiated_model_not_found" } }
+
+    tracker = TrainTracker(args["trainingSessionId"])
+    trainingSessions[args["trainingSessionId"]] = tracker
 
     instantiatedModel = instantiatedModels[args["instantiatedModelId"]]
     if inspect.isawaitable(instantiatedModel["model"]):
@@ -171,12 +188,16 @@ async def callTrain(args):
         model = instantiatedModel["model"]
 
     complete = { "complete": False }
-    map = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
+    class TrainOptions:
+        def __init__(self):
+            self.params = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
+            self.tracker = tracker
+
     try:
         if isinstance(model, dict):
-            res = model["train"](map, tracker)
+            res = model["train"](TrainOptions())
         else:
-            res = model.train(map, tracker)
+            res = model.train(TrainOptions())
 
         if inspect.isawaitable(res):
             await res
@@ -210,12 +231,15 @@ async def callEvaluate(args):
     else:
         model = instantiatedModel["model"]
     complete = { "complete": False }
-    map = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
+    class EvaluateOptions:
+        def __init__(self):
+            self.params = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
+
     try:
         if isinstance(model, dict):
-            res = model["evaluate"](map)
+            res = model["evaluate"](EvaluateOptions())
         else:
-            res = model.evaluate(map)
+            res = model.evaluate(EvaluateOptions())
 
         if inspect.isawaitable(res):
             awaitedres = await res
@@ -259,13 +283,15 @@ async def callGetModelState(args):
         model = instantiatedModel["model"]
     
     complete = { "complete": False }
-    provider = createStateProvider(complete, args["id"], sendEventToParent)
+    class GetModelStateOptions:
+        def __init__(self):
+            self.state_provider = createStateProvider(complete, args["id"], sendEventToParent)
 
     try:
         if isinstance(model, dict):
-            res = model["getModelState"](provider)
+            res = model["getModelState"](GetModelStateOptions())
         else:
-            res = model.getModelState(provider)
+            res = model.getModelState(GetModelStateOptions())
 
         if inspect.isawaitable(res):
             await res
