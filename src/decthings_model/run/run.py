@@ -49,10 +49,12 @@ class TrainTracker:
             byteslist.append(metric["value"])
         sendEventToParent('trainingMetrics', { "trainingSessionId": self.id, "names": nameslist }, byteslist)
 
-def getErrorFromException():
+def getErrorFromException(method: str):
     err_str = traceback.format_exc()
     if len(err_str) > 10000:
-        err_str = err_str[0:10000] + f" (exception shortened - actual exception contained {len(err_str) - 10000} more characters)"
+        print(f"Exception in model during {method}:", file=sys.stderr)
+        print(err_str, file=sys.stderr)
+        err_str = err_str[0:10000] + f" (exception shortened - actual exception contained {len(err_str) - 10000} more characters). See stderr for full exception."
     return { "code": "exception", "details": err_str }
 
 def initialize(args):
@@ -70,7 +72,7 @@ def initialize(args):
         global runningProgram
         runningProgram = _module.model
     except:
-        sendEventToParent("modelSessionInitialized", { "error": getErrorFromException() }, [])
+        sendEventToParent("modelSessionInitialized", { "error": getErrorFromException("code startup") }, [])
         return
     sendEventToParent("modelSessionInitialized", {}, [])
 
@@ -102,7 +104,7 @@ async def callCreateModelState(args):
         return { "result": {} }
     except:
         complete["complete"] = True
-        return { "result": { "error": getErrorFromException() } }
+        return { "result": { "error": getErrorFromException("createModelState") } }
 
 class OtherModel:
     def __init__(self, mount_path):
@@ -150,7 +152,7 @@ async def callInstantiateModel(args):
         if not disposed:
             del instantiatedModels[args["instantiatedModelId"]]
             modelFuture.set_result(None)
-        return { "result": { "error": getErrorFromException() } }
+        return { "result": { "error": getErrorFromException("instantiateModel") } }
 
     stored["model"] = awaitedres
 
@@ -208,7 +210,7 @@ async def callTrain(args):
         tracker._complete = True
         complete["complete"] = True
         del trainingSessions[args["trainingSessionId"]]
-        return { "result": { "error": getErrorFromException() } }
+        return { "result": { "error": getErrorFromException("train") } }
 
     del trainingSessions[args["trainingSessionId"]]
     return { "result": {} }
@@ -267,7 +269,7 @@ async def callEvaluate(args):
             alsoSend.extend(el['data'])
     except:
         complete["complete"] = True
-        return { "result": { "error": getErrorFromException() } }
+        return { "result": { "error": getErrorFromException("evaluate") } }
 
     return { "result": { "outputs": outputs }, "alsoSend": [b''.join(alsoSend)] }
 
@@ -299,7 +301,7 @@ async def callGetModelState(args):
         complete["complete"] = True
     except:
         complete["complete"] = True
-        return { "result": { "error": getErrorFromException() } }
+        return { "result": { "error": getErrorFromException("getModelState") } }
 
     return { "result": {} }
 
