@@ -260,7 +260,7 @@ class _Model:
                 raise ValueError('The function "train" was missing from the instantiated model.')
             if not callable(fn):
                 raise ValueError(f'The property "train" on the instantiated model was not a function - got {str(type(fn))}.')
-            return awaitedinstantiated.train(TrainOptions)
+            return awaitedinstantiated.train(TrainOptions())
 
 
 def make_model(executor) -> dict:
