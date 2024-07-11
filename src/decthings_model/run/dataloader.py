@@ -107,6 +107,7 @@ def createDataLoader(complete, dataset, size, total_byte_size, sendDataEventToPa
         sendDataEventToParent({ "event": "shuffle", "datasets": datasets })
 
     return DataLoader({
+        "dataset": dataset,
         "size": size,
         "totalByteSize": total_byte_size,
         "read": inner_read,

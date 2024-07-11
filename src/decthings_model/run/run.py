@@ -328,8 +328,8 @@ def sendMessageToParent(message):
     loop = asyncio.get_event_loop()
     loop.create_task(_sendMessageToParent(message))
 
-def sendEventToParent(event, params, additionalSegments):
-    toSend = [json.dumps({ "event": event, "params": params }).encode(), *additionalSegments]
+def sendEventToParent(event, params, blobs):
+    toSend = [json.dumps({ "event": event, "params": params }).encode(), *blobs]
 
     argsTotalSize = 0
     for el in toSend:
@@ -398,19 +398,19 @@ async def inner_main():
         first_byte = (await reader.readexactly(1))[0]
         if first_byte == 0:
             # RPC
-            segment_len = int.from_bytes(await reader.readexactly(8), 'big')
-            segment_data = await reader.readexactly(segment_len)
+            blob_len = int.from_bytes(await reader.readexactly(8), 'big')
+            blob_data = await reader.readexactly(blob_len)
             loop = asyncio.get_event_loop()
-            loop.create_task(processMessage(segment_data))
+            loop.create_task(processMessage(blob_data))
         else:
             # Provide data
             request_id = int.from_bytes(await reader.readexactly(4), 'big')
-            num_segments = int.from_bytes(await reader.readexactly(4), 'big')
+            num_blobs = int.from_bytes(await reader.readexactly(4), 'big')
             data = []
-            for i in range(num_segments):
-                segment_len = int.from_bytes(await reader.readexactly(8), 'big')
-                segment_data = await reader.readexactly(segment_len)
-                data.append(segment_data)
+            for i in range(num_blobs):
+                blob_len = int.from_bytes(await reader.readexactly(8), 'big')
+                blob_data = await reader.readexactly(blob_len)
+                data.append(blob_data)
             onDataProvided(request_id, data)
 
 def main():
