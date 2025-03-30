@@ -7,7 +7,7 @@ import traceback
 import inspect
 import typing
 
-from .dataloader import createDataLoaderMap, createStateLoaderMap, createStateProvider, onDataProvided
+from .dataloader import createDataLoaderMap, createWeightsLoaderMap, createWeightsProvider, onDataProvided
 
 runningProgram: typing.Any = None
 instantiatedModels = {}
@@ -76,26 +76,26 @@ def initialize(args):
         return
     sendEventToParent("modelSessionInitialized", {}, [])
 
-class OtherModelWithState:
-    def __init__(self, mount_path, state):
+class OtherModelWithWeights:
+    def __init__(self, mount_path, weights):
         self.mount_path = mount_path
-        self.state = state
+        self.weights = weights
 
-async def callCreateModelState(args):
+async def callInitializeWeights(args):
     complete = { "complete": False }
-    class CreateModelStateOptions:
+    class InitializeWeightsOptions:
         def __init__(self):
             self.params = createDataLoaderMap(complete, args["params"], sendDataEventToParent)
-            self.state_provider = createStateProvider(complete, args["id"], sendEventToParent)
+            self.weights_provider = createWeightsProvider(complete, args["id"], sendEventToParent)
             self.other_models = {}
             for other_model in args["otherModels"]:
-                self.other_models[other_model["id"]] = OtherModelWithState(other_model["mountPath"], createStateLoaderMap(complete, other_model["state"], sendDataEventToParent))
+                self.other_models[other_model["id"]] = OtherModelWithWeights(other_model["mountPath"], createWeightsLoaderMap(complete, other_model["weights"], sendDataEventToParent))
 
     try:
         if isinstance(runningProgram, dict):
-            res = runningProgram["createModelState"](CreateModelStateOptions())
+            res = runningProgram["initializeWeights"](InitializeWeightsOptions())
         else:
-            res = runningProgram.createModelState(CreateModelStateOptions())
+            res = runningProgram.initializeWeights(InitializeWeightsOptions())
 
         if inspect.isawaitable(res):
             await res
@@ -104,7 +104,7 @@ async def callCreateModelState(args):
         return { "result": {} }
     except:
         complete["complete"] = True
-        return { "result": { "error": getErrorFromException("createModelState") } }
+        return { "result": { "error": getErrorFromException("initializeWeights") } }
 
 class OtherModel:
     def __init__(self, mount_path):
@@ -131,7 +131,7 @@ async def callInstantiateModel(args):
     complete = { "complete": False }
     class InstantiateModelOptions:
         def __init__(self):
-            self.state = createStateLoaderMap(complete, args["state"], sendDataEventToParent)
+            self.weights = createWeightsLoaderMap(complete, args["weights"], sendDataEventToParent)
             self.other_models = {}
             for other_model in args["otherModels"]:
                 self.other_models[other_model["id"]] = OtherModel(other_model["mountPath"])
@@ -273,7 +273,7 @@ async def callEvaluate(args):
 
     return { "result": { "outputs": outputs }, "alsoSend": [b''.join(alsoSend)] }
 
-async def callGetModelState(args):
+async def callGetWeights(args):
     if not args["instantiatedModelId"] in instantiatedModels:
         return { "result": { "error": "instantiated_model_not_found" } }
     instantiatedModel = instantiatedModels[args["instantiatedModelId"]]
@@ -285,15 +285,15 @@ async def callGetModelState(args):
         model = instantiatedModel["model"]
     
     complete = { "complete": False }
-    class GetModelStateOptions:
+    class GetWeightsOptions:
         def __init__(self):
-            self.state_provider = createStateProvider(complete, args["id"], sendEventToParent)
+            self.weights_provider = createWeightsProvider(complete, args["id"], sendEventToParent)
 
     try:
         if isinstance(model, dict):
-            res = model["getModelState"](GetModelStateOptions())
+            res = model["getWeights"](GetWeightsOptions())
         else:
-            res = model.getModelState(GetModelStateOptions())
+            res = model.getWeights(GetWeightsOptions())
 
         if inspect.isawaitable(res):
             await res
@@ -301,18 +301,18 @@ async def callGetModelState(args):
         complete["complete"] = True
     except:
         complete["complete"] = True
-        return { "result": { "error": getErrorFromException("getModelState") } }
+        return { "result": { "error": getErrorFromException("getWeights") } }
 
     return { "result": {} }
 
 rpc = {
     "initialize": initialize,
-    "callCreateModelState": callCreateModelState,
+    "callInitializeWeights": callInitializeWeights,
     "callInstantiateModel": callInstantiateModel,
     "callDisposeInstantiatedModel": callDisposeInstantiatedModel,
     "callTrain": callTrain,
     "callEvaluate": callEvaluate,
-    "callGetModelState": callGetModelState,
+    "callGetWeights": callGetWeights,
 }
 
 sock_lock = asyncio.Lock()

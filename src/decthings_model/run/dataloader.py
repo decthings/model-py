@@ -65,7 +65,7 @@ class DataLoader:
 
         return await ret
 
-class StateLoader:
+class WeightsLoader:
     def __init__(self, inner: DataLoader):
         self._inner = inner
 
@@ -120,45 +120,45 @@ def createDataLoaderMap(complete, params, sendDataEventToParent):
         map[param["name"]] = createDataLoader(complete, param['dataset'], param['amount'], param['totalByteSize'], sendDataEventToParent)
     return map
 
-def createStateLoaderMap(complete, params, sendDataEventToParent):
+def createWeightsLoaderMap(complete, params, sendDataEventToParent):
     map = {}
     for param in params:
-        map[param["name"]] = StateLoader(createDataLoader(complete, param['dataset'], param['amount'], param['totalByteSize'], sendDataEventToParent))
+        map[param["name"]] = WeightsLoader(createDataLoader(complete, param['dataset'], param['amount'], param['totalByteSize'], sendDataEventToParent))
     return map
 
-class StateProvider:
+class WeightsProvider:
     def __init__(self, provide):
         self._provide = provide
 
     def provide_all(self, data):
         if not isinstance(data, list) or any([not isinstance(x, dict) or not 'key' in x or not 'data' in x or not isinstance(x['key'], str) or not isinstance(x['data'], bytes) for x in data]):
-            raise TypeError('StateProvider provide: Expected "data" to be a list of dictionaries like { "key": str, "data": bytes }.')
+            raise TypeError('WeightsProvider provide: Expected "data" to be a list of dictionaries like { "key": str, "data": bytes }.')
         self._provide(data)
 
     def provide(self, key, data):
         if not isinstance(key, str):
-            raise TypeError('StateProvider provide: Expected "key" to be a string.')
+            raise TypeError('WeightsProvider provide: Expected "key" to be a string.')
         if not isinstance(data, bytes):
-            raise TypeError('StateProvider provide: Expected "data" to be bytes.')
+            raise TypeError('WeightsProvider provide: Expected "data" to be bytes.')
         self._provide([{ "key": key, "data": data }])
 
 
-def createStateProvider(complete, commandId, sendEventToParent):
+def createWeightsProvider(complete, commandId, sendEventToParent):
     provided = set()
     def _provide(data):
         if complete["complete"]:
-            raise Exception('StateProvider: Cannot provide data after the function was completed.')
+            raise Exception('WeightsProvider: Cannot provide data after the function was completed.')
 
         for x in data:
             if x['key'] in provided:
-                raise Exception(f'StateProvider: State key "{x["key"]}" was provided multiple times.')
+                raise Exception(f'WeightsProvider: Weight key "{x["key"]}" was provided multiple times.')
             provided.add(x['key'])
 
         if len(provided) + len(data) > 100:
-            raise Exception('StateProvider: Cannot provide more than 100 keys.')
+            raise Exception('WeightsProvider: Cannot provide more than 100 keys.')
         for el in data:
             if len(el) > math.pow(1024, 3):
-                raise TypeError('StateProvider: Cannot provide more than 1 gigabyte for a single key. Split it into multiple keys.')
+                raise TypeError('WeightsProvider: Cannot provide more than 1 gigabyte for a single key. Split it into multiple keys.')
 
         i = 0
         while i < len(data):
@@ -171,9 +171,9 @@ def createStateProvider(complete, commandId, sendEventToParent):
                 to_send.append(data[i]['data'])
                 names.append(data[i]['key'])
                 i += 1
-            sendEventToParent('provideStateData', { "commandId": commandId, "names": names }, to_send)
+            sendEventToParent('provideWeightData', { "commandId": commandId, "names": names }, to_send)
 
-    return StateProvider(_provide)
+    return WeightsProvider(_provide)
 
 
 def onDataProvided(requestId, data):

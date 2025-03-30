@@ -69,7 +69,7 @@ class DataLoader:
         res = await self._inner.next(amount)
         return list(map(lambda x: DecthingsTensor.deserialize(x)[0], res))
 
-class StateLoader:
+class WeightsLoader:
     def __init__(self, inner) -> None:
         self._inner = inner
 
@@ -96,9 +96,9 @@ class TrainTracker:
         self._inner.progress(progress)
 
 DataLoaderMap = typing.Dict[str, DataLoader]
-StateLoaderMap = typing.Dict[str, StateLoader]
+WeightsLoaderMap = typing.Dict[str, WeightsLoader]
 
-class StateProvider:
+class WeightsProvider:
     def provide(self, key: str, data: bytes) -> None:
         pass
 
@@ -114,26 +114,26 @@ class _Model:
         return new_params
 
     @staticmethod
-    def createModelState(executor, options):
-        class CreateModelStateOptions:
+    def initializeWeights(executor, options):
+        class InitializeWeightsOptions:
             def __init__(self):
                 self.params = _Model._create_data_loader_map(options.params)
-                self.state_provider = options.state_provider
+                self.weights_provider = options.weights_provider
                 self.other_models = options.other_models
 
         if isinstance(executor, dict):
-            if "createModelState" not in executor:
-                raise ValueError('The function "createModelState" was missing from the executor.')
-            if not callable(executor["createModelState"]):
-                raise ValueError(f'The property "createModelState" on the executor was not a function - got {str(type(executor["createModelState"]))}.')
-            return executor["createModelState"](CreateModelStateOptions())
+            if "initializeWeights" not in executor:
+                raise ValueError('The function "initializeWeights" was missing from the executor.')
+            if not callable(executor["initializeWeights"]):
+                raise ValueError(f'The property "initializeWeights" on the executor was not a function - got {str(type(executor["initializeWeights"]))}.')
+            return executor["initializeWeights"](InitializeWeightsOptions())
         else:
-            fn = getattr(executor, "createModelState", None)
+            fn = getattr(executor, "initializeWeights", None)
             if fn is None:
-                raise ValueError('The function "createModelState" was missing from the executor.')
+                raise ValueError('The function "initializeWeights" was missing from the executor.')
             if not callable(fn):
-                raise ValueError(f'The property "createModelState" on the executor was not a function - got {str(type(fn))}.')
-            return executor.createModelState(CreateModelStateOptions())
+                raise ValueError(f'The property "initializeWeights" on the executor was not a function - got {str(type(fn))}.')
+            return executor.initializeWeights(InitializeWeightsOptions())
 
     @staticmethod
     async def instantiateModel(executor, options):
@@ -159,7 +159,7 @@ class _Model:
         return {
             "evaluate": lambda options: _Model.evaluate(awaitedinstantiated, options),
             "dispose": lambda: _Model.dispose(awaitedinstantiated),
-            "getModelState": lambda options: _Model.getModelState(awaitedinstantiated, options),
+            "getWeights": lambda options: _Model.getWeights(awaitedinstantiated, options),
             "train": lambda options: _Model.train(awaitedinstantiated, options)
         }
 
@@ -200,7 +200,7 @@ class _Model:
                 raise ValueError(f'Evaluate: Expected the field "data" in each element of return list of "evaluate" to be a list, not {str(type(output_param["data"]))}.')
             def map_fn2(value):
                 if not isinstance(value, DecthingsTensor):
-                    raise ValueError(f'Evalutate: Expected each element in the list "data" in each element of return list of "evaluate" to be a DecthingsTensor, not {str(type(value))}.')
+                    raise ValueError(f'Evaluate: Expected each element in the list "data" in each element of return list of "evaluate" to be a DecthingsTensor, not {str(type(value))}.')
                 return value.serialize()
             return {
                 "name": output_param["name"],
@@ -226,20 +226,20 @@ class _Model:
             return awaitedinstantiated.dispose()
 
     @staticmethod
-    def getModelState(awaitedinstantiated, options):
+    def getWeights(awaitedinstantiated, options):
         if isinstance(awaitedinstantiated, dict):
-            if "getModelState" not in awaitedinstantiated:
-                raise ValueError('The function "getModelState" was missing from the instantiated model.')
-            if not callable(awaitedinstantiated["getModelState"]):
-                raise ValueError(f'The property "getModelState" on the instantiated model was not a function - got {str(type(awaitedinstantiated["getModelState"]))}.')
-            return awaitedinstantiated["getModelState"](options)
+            if "getWeights" not in awaitedinstantiated:
+                raise ValueError('The function "getWeights" was missing from the instantiated model.')
+            if not callable(awaitedinstantiated["getWeights"]):
+                raise ValueError(f'The property "getWeights" on the instantiated model was not a function - got {str(type(awaitedinstantiated["getWeights"]))}.')
+            return awaitedinstantiated["getWeights"](options)
         else:
-            fn = getattr(awaitedinstantiated, "getModelState", None)
+            fn = getattr(awaitedinstantiated, "getWeights", None)
             if fn is None:
-                raise ValueError('The function "getModelState" was missing from the instantiated model.')
+                raise ValueError('The function "getWeights" was missing from the instantiated model.')
             if not callable(fn):
-                raise ValueError(f'The property "getModelState" on the model was not a function - got {str(type(fn))}.')
-            return awaitedinstantiated.getModelState(options)
+                raise ValueError(f'The property "getWeights" on the model was not a function - got {str(type(fn))}.')
+            return awaitedinstantiated.getWeights(options)
 
     @staticmethod
     def train(awaitedinstantiated, options):
@@ -265,6 +265,6 @@ class _Model:
 
 def make_model(executor) -> dict:
     return {
-        "createModelState": lambda options: _Model.createModelState(executor, options),
+        "initializeWeights": lambda options: _Model.initializeWeights(executor, options),
         "instantiateModel": lambda options: _Model.instantiateModel(executor, options)
     }
